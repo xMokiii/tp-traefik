@@ -1,0 +1,40 @@
+# Exercice 5 — configuration statique de production (proposition)
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: false          # plus de port 8080 en clair : dashboard via router sécurisé
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+  admin:
+    address: ":8443"        # publié uniquement sur l'IP VPN (voir compose)
+
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"   # API Docker filtrée, pas de socket monté
+    exposedByDefault: false
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  le:
+    acme:
+      email: devops@devtech.example
+      storage: /acme/acme.json
+      tlsChallenge: {}

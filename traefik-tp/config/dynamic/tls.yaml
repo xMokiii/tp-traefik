@@ -1,0 +1,26 @@
+# Configuration DYNAMIQUE (provider file) : certificats, options TLS, middlewares
+# Les fichiers de certificats sont montés depuis ./certs (hors Git).
+
+tls:
+  certificates:
+    - certFile: /certs/localhost.crt
+      keyFile: /certs/localhost.key
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    security-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "no-referrer"
+        # HSTS volontairement court en labo (à n'augmenter qu'une fois HTTPS stable)
+        stsSeconds: 300

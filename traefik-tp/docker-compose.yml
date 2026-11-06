@@ -1,0 +1,96 @@
+# TP5 - Reverse Proxy et Load Balancing avec Traefik et Docker
+# Version finale : Phases 1 à 8 (HTTP, découverte Docker, 2 applis, LB, HTTPS, middlewares)
+
+# Durcissement commun aux conteneurs Nginx (moindre privilège)
+x-nginx-hardening: &nginx-hardening
+  image: nginx:1.28.0          # version identifiée (pas de tag flottant)
+  read_only: true
+  tmpfs:
+    - /var/cache/nginx
+    - /var/run
+    - /tmp
+  cap_drop: [ALL]
+  cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
+  security_opt:
+    - no-new-privileges:true
+  networks:
+    - frontend
+  restart: unless-stopped
+  # AUCUNE section "ports" : les applis ne sont joignables que via Traefik
+
+services:
+  traefik:
+    image: traefik:v3.6.2   # v3.5.2 incompatible avec Docker Engine 29 (API min 1.44)
+    container_name: traefik-1
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"   # dashboard/API : machine locale uniquement
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik.yaml:/etc/traefik/traefik.yaml:ro
+      - ./config/dynamic:/etc/traefik/dynamic:ro
+      - ./certs/localhost.crt:/certs/localhost.crt:ro
+      - ./certs/localhost.key:/certs/localhost.key:ro
+    command:
+      - "--configFile=/etc/traefik/traefik.yaml"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - frontend
+    restart: unless-stopped
+
+  app1:
+    <<: *nginx-hardening
+    container_name: nginx-app1
+    volumes:
+      - ./app1:/usr/share/nginx/html:ro
+    labels: &app1-labels
+      - "traefik.enable=true"
+      # Router HTTP
+      - "traefik.http.routers.app1.rule=Host(`app1.localhost`)"
+      - "traefik.http.routers.app1.entrypoints=web"
+      - "traefik.http.routers.app1.service=app1"
+      # Router HTTPS (TLS terminé par Traefik, certificat signé par la CA locale)
+      - "traefik.http.routers.app1-secure.rule=Host(`app1.localhost`)"
+      - "traefik.http.routers.app1-secure.entrypoints=websecure"
+      - "traefik.http.routers.app1-secure.tls=true"
+      - "traefik.http.routers.app1-secure.service=app1"
+      - "traefik.http.routers.app1-secure.middlewares=security-headers@file"
+      # Service logique partagé par app1 et app1b (Load Balancing)
+      - "traefik.http.services.app1.loadbalancer.server.port=80"
+      - "traefik.http.services.app1.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.app1.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.app1.loadbalancer.healthcheck.timeout=2s"
+
+  # Phase 6 : deuxième instance de l'application 1 (mêmes noms de router/service)
+  app1b:
+    <<: *nginx-hardening
+    container_name: nginx-app1b
+    volumes:
+      - ./app1b:/usr/share/nginx/html:ro
+    labels: *app1-labels
+
+  app2:
+    <<: *nginx-hardening
+    container_name: nginx-app2
+    volumes:
+      - ./app2:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app2.rule=Host(`app2.localhost`)"
+      - "traefik.http.routers.app2.entrypoints=web"
+      - "traefik.http.services.app2.loadbalancer.server.port=80"
+
+  # Témoin de sécurité : conteneur SANS traefik.enable=true -> ne doit recevoir aucune route
+  app3-private:
+    <<: *nginx-hardening
+    container_name: nginx-app3-private
+    volumes:
+      - ./app3:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.http.routers.app3.rule=Host(`app3.localhost`)"
+
+networks:
+  frontend:
+    external: true

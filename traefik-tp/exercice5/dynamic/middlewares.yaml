@@ -1,0 +1,26 @@
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+
+http:
+  middlewares:
+    admin-auth:
+      basicAuth:
+        usersFile: /secrets/admin.htpasswd   # hash bcrypt, fichier hors Git
+        removeHeader: true
+    vpn-only:
+      ipAllowList:
+        sourceRange: ["10.8.0.0/24"]
+    rate-limit:
+      rateLimit:
+        average: 50
+        burst: 100
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"

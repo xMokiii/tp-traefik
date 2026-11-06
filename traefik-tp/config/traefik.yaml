@@ -1,0 +1,30 @@
+# Configuration STATIQUE de Traefik (lue au démarrage uniquement)
+# Après modification : docker compose restart traefik
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: DEBUG            # laboratoire uniquement -> INFO/WARN en production
+
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: true          # laboratoire uniquement : API/dashboard sur :8080 (publié sur 127.0.0.1)
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false   # seuls les conteneurs avec traefik.enable=true sont routés
+    network: frontend
+  file:
+    directory: /etc/traefik/dynamic   # config dynamique fichier : certificats TLS, middlewares
+    watch: true

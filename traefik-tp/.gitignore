@@ -1,0 +1,7 @@
+# Secrets et clés privées : jamais dans le dépôt
+certs/
+*.key
+*.pem
+*.crt
+.env
+*.htpasswd
