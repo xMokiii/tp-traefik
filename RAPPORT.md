@@ -5,7 +5,7 @@ Environnement : Windows 11, Docker Desktop (Engine 29.1.3, Compose v2.40.3), cur
 ## 1. Arborescence livrée
 
 ```
-traefik-tp/
+tp-traefik/
 ├── docker-compose.yml          # Traefik + app1 + app1b + app2 + app3-private (témoin)
 ├── config/
 │   ├── traefik.yaml            # configuration statique
